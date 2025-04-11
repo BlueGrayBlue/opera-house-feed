@@ -2,7 +2,7 @@ from flask import Flask, Response
 from bs4 import BeautifulSoup
 from feedgen.feed import FeedGenerator
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -25,9 +25,9 @@ def rss_feed():
     fg.link(href=whats_on_url, rel='alternate')
     fg.description("Live feed of Sydney Opera House events between 10–13 May 2025")
     fg.generator('python-feedgen')
-    fg.lastBuildDate(datetime.utcnow())
+    fg.lastBuildDate(datetime.now(timezone.utc))  # ✅ Fixed timezone-aware date
 
-    # Filter date range
+    # Define the target date range
     range_start = datetime(2025, 5, 10)
     range_end = datetime(2025, 5, 13)
 
@@ -39,12 +39,12 @@ def rss_feed():
             venue = card.select_one('.card__venue').text.strip()
             link = base_url + card.select_one('a')['href']
 
-            # Parse date
+            # Convert event date range
             date_range = date_text.replace('–', '-').split('-')
             start_date = datetime.strptime(date_range[0].strip() + " 2025", "%d %b %Y")
             end_date = datetime.strptime(date_range[-1].strip() + " 2025", "%d %b %Y")
 
-            # Date filter
+            # Filter: Only include events within 10–13 May 2025
             if end_date < range_start or start_date > range_end:
                 continue
 
@@ -57,11 +57,11 @@ def rss_feed():
             item.guid(link)
 
         except Exception as e:
-            print("Skipping a card due to error:", e)
+            print("Skipping item due to error:", e)
             continue
 
-    rss_xml = fg.rss_str(pretty=True)
-    return Response(rss_xml, mimetype='application/rss+xml')
+    rss_output = fg.rss_str(pretty=True)
+    return Response(rss_output, mimetype='application/rss+xml')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
